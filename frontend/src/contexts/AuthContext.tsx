@@ -23,7 +23,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Get initial session
+    // Check for testing mode session first
+    const testingSession = localStorage.getItem('gitam-testing-session')
+    const testingProfile = localStorage.getItem('gitam-testing-profile')
+    
+    if (testingSession && testingProfile) {
+      // Restore testing mode session
+      const parsedSession = JSON.parse(testingSession)
+      const parsedProfile = JSON.parse(testingProfile)
+      
+      setSession(parsedSession)
+      setUser(parsedSession.user)
+      setUserProfile(parsedProfile)
+      setLoading(false)
+      return
+    }
+
+    // Get initial session from Supabase
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
@@ -43,6 +59,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await fetchUserProfile(session.user.id)
       } else {
         setUserProfile(null)
+        // Clear testing mode data on logout
+        localStorage.removeItem('gitam-testing-session')
+        localStorage.removeItem('gitam-testing-profile')
       }
       setLoading(false)
     })
@@ -150,6 +169,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(mockSession as Session)
       setUserProfile(mockProfile)
 
+      // Persist testing session to localStorage
+      localStorage.setItem('gitam-testing-session', JSON.stringify(mockSession))
+      localStorage.setItem('gitam-testing-profile', JSON.stringify(mockProfile))
+
       console.log(`🚀 TESTING: Logged in as ${mockProfile.name} (${rollNumberOrFacultyId})`)
       
       return { success: true }
@@ -186,6 +209,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
+    // Clear testing mode data
+    localStorage.removeItem('gitam-testing-session')
+    localStorage.removeItem('gitam-testing-profile')
+    
+    // Clear state
+    setUser(null)
+    setSession(null)
+    setUserProfile(null)
+    
+    // Also clear Supabase session (if any)
     await supabase.auth.signOut()
   }
 
