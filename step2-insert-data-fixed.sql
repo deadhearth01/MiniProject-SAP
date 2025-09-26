@@ -1,9 +1,9 @@
 -- =============================================
--- STEP 2: INSERT SAMPLE DATA
+-- STEP 2: INSERT SAMPLE DATA (FIXED VERSION)
 -- Run this AFTER step 1 completes successfully
 -- =============================================
 
--- Insert user profiles (Admin, Faculty, Students)
+-- Insert Faculty user (Admin already exists from step 1)
 INSERT INTO public.user_profiles (
     name,
     roll_number_faculty_id,
@@ -15,20 +15,6 @@ INSERT INTO public.user_profiles (
     is_admin,
     is_faculty
 ) VALUES 
--- Admin user (skip if exists)
-(
-    'System Administrator',
-    'ADMIN001',
-    'Administration',
-    'System Administration',
-    'Database Management',
-    '2020-Present',
-    '+91-9999999999',
-    true,
-    false
-)
-ON CONFLICT (roll_number_faculty_id) DO NOTHING,
--- Faculty user
 (
     'Dr. Rajesh Kumar',
     'FAC001',
@@ -39,8 +25,21 @@ ON CONFLICT (roll_number_faculty_id) DO NOTHING,
     '+91-9876543210',
     false,
     true
-),
--- Student users
+)
+ON CONFLICT (roll_number_faculty_id) DO NOTHING;
+
+-- Insert Student users
+INSERT INTO public.user_profiles (
+    name,
+    roll_number_faculty_id,
+    school,
+    branch,
+    specialization,
+    batch,
+    phone,
+    is_admin,
+    is_faculty
+) VALUES 
 (
     'Priya Sharma',
     'STU001',
@@ -95,7 +94,8 @@ ON CONFLICT (roll_number_faculty_id) DO NOTHING,
     '+91-9876543215',
     false,
     false
-);
+)
+ON CONFLICT (roll_number_faculty_id) DO NOTHING;
 
 -- Insert sample achievements
 INSERT INTO public.achievements (
@@ -172,6 +172,24 @@ INSERT INTO public.achievements (
     'approved', 
     80
 ),
+(
+    (SELECT id FROM public.user_profiles WHERE roll_number_faculty_id = 'STU002'),
+    'State Robotics Championship', 
+    'Co-curricular', 
+    'State', 
+    '2024-05-10', 
+    '1st', 
+    'School of Technology', 
+    'Mechanical Engineering', 
+    'Robotics', 
+    '2021-2025', 
+    'AP State Government', 
+    'Visakhapatnam', 
+    'proofs/state-robotics.pdf', 
+    'Won state level robotics competition', 
+    'approved', 
+    50
+),
 -- STU003 achievements
 (
     (SELECT id FROM public.user_profiles WHERE roll_number_faculty_id = 'STU003'),
@@ -191,6 +209,43 @@ INSERT INTO public.achievements (
     'approved', 
     50
 ),
+(
+    (SELECT id FROM public.user_profiles WHERE roll_number_faculty_id = 'STU003'),
+    'College Research Symposium', 
+    'Curricular', 
+    'College', 
+    '2024-04-15', 
+    '1st', 
+    'School of Science', 
+    'Biotechnology', 
+    'Medical Biotechnology', 
+    '2023-2027', 
+    'GITAM University', 
+    'GITAM Campus', 
+    'proofs/college-research.pdf', 
+    'Best research presentation award', 
+    'approved', 
+    25
+),
+-- STU004 achievements (approved)
+(
+    (SELECT id FROM public.user_profiles WHERE roll_number_faculty_id = 'STU004'),
+    'National Mathematics Olympiad', 
+    'Curricular', 
+    'National', 
+    '2024-03-20', 
+    '2nd', 
+    'School of Science', 
+    'Mathematics', 
+    'Applied Mathematics', 
+    '2022-2026', 
+    'Indian Mathematical Society', 
+    'Chennai', 
+    'proofs/math-olympiad.pdf', 
+    'Secured second position in national mathematics olympiad', 
+    'approved', 
+    60
+),
 -- Pending achievements for testing approval workflow
 (
     (SELECT id FROM public.user_profiles WHERE roll_number_faculty_id = 'STU004'),
@@ -209,16 +264,34 @@ INSERT INTO public.achievements (
     'Developed machine learning model for traffic optimization', 
     'pending', 
     0
+),
+(
+    (SELECT id FROM public.user_profiles WHERE roll_number_faculty_id = 'STU005'),
+    'Inter-University Sports Meet', 
+    'Extracurricular', 
+    'State', 
+    '2024-11-10', 
+    '1st', 
+    'School of Physical Education', 
+    'Sports Science', 
+    'Athletic Performance', 
+    '2022-2026', 
+    'Andhra Pradesh Universities', 
+    'Guntur', 
+    'proofs/sports-meet.pdf', 
+    'Won gold medal in 100m sprint', 
+    'pending', 
+    0
 );
 
 -- Insert leaderboard data
 INSERT INTO public.leaderboard (user_id, year, total_points, rank, month)
 SELECT 
     up.id,
-    EXTRACT(YEAR FROM CURRENT_DATE),
-    COALESCE(SUM(a.points), 0),
-    ROW_NUMBER() OVER (ORDER BY COALESCE(SUM(a.points), 0) DESC),
-    EXTRACT(MONTH FROM CURRENT_DATE)
+    EXTRACT(YEAR FROM CURRENT_DATE)::INTEGER,
+    COALESCE(SUM(a.points), 0)::INTEGER,
+    ROW_NUMBER() OVER (ORDER BY COALESCE(SUM(a.points), 0) DESC)::INTEGER,
+    EXTRACT(MONTH FROM CURRENT_DATE)::INTEGER
 FROM public.user_profiles up
 LEFT JOIN public.achievements a ON up.id = a.user_id AND a.status = 'approved'
 WHERE up.is_admin = false AND up.is_faculty = false
@@ -226,19 +299,48 @@ GROUP BY up.id;
 
 -- Insert sample notifications
 INSERT INTO public.notifications (user_id, title, message, type, is_read) VALUES
--- For students
+-- Achievement approval notifications for students
 (
     (SELECT id FROM public.user_profiles WHERE roll_number_faculty_id = 'STU001'),
     'Achievement Approved!',
-    'Your achievement "International Coding Championship" has been approved and 100 points have been added.',
+    'Your achievement "International Coding Championship" has been approved and 100 points have been added to your profile.',
     'achievement',
     false
 ),
--- For faculty/admin
+(
+    (SELECT id FROM public.user_profiles WHERE roll_number_faculty_id = 'STU001'),
+    'Achievement Approved!',
+    'Your achievement "Smart India Hackathon" has been approved and 75 points have been added to your profile.',
+    'achievement',
+    false
+),
+(
+    (SELECT id FROM public.user_profiles WHERE roll_number_faculty_id = 'STU002'),
+    'Achievement Approved!',
+    'Your achievement "International Robotics Competition" has been approved and 80 points have been added.',
+    'achievement',
+    true
+),
+-- Pending approval notifications for faculty/admin
 (
     (SELECT id FROM public.user_profiles WHERE roll_number_faculty_id = 'FAC001'),
-    'New Achievement Pending',
+    'New Achievement Pending Approval',
     'Student Vikram Singh has submitted "Hackathon Delhi 2024" for approval.',
     'approval_required',
     false
+),
+(
+    (SELECT id FROM public.user_profiles WHERE roll_number_faculty_id = 'FAC001'),
+    'New Achievement Pending Approval',
+    'Student Anita Gupta has submitted "Inter-University Sports Meet" for approval.',
+    'approval_required',
+    false
+),
+-- General notifications
+(
+    (SELECT id FROM public.user_profiles WHERE roll_number_faculty_id = 'STU003'),
+    'Welcome to GITAM Achievement Portal!',
+    'Start tracking your achievements and climb up the leaderboard.',
+    'general',
+    true
 );
