@@ -79,7 +79,7 @@ export default function Navigation() {
                 height={40}
                 className="h-10 w-10"
               />
-              <span className="ml-3 text-white text-xl font-bold hidden sm:block">
+              <span className="ml-3 gitam-header-text text-xl font-bold hidden sm:block">
                 GITAM Portal
               </span>
             </Link>
@@ -92,10 +92,10 @@ export default function Navigation() {
                   <Link
                     key={item.name}
                     href={item.href}
-                    className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    className={`gitam-nav-item flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                       isActive(item.href)
-                        ? 'bg-white bg-opacity-20 text-white'
-                        : 'text-white hover:bg-white hover:bg-opacity-10 hover:text-white'
+                        ? 'bg-white bg-opacity-20'
+                        : 'hover:bg-white hover:bg-opacity-10'
                     }`}
                   >
                     <Icon className="w-4 h-4 mr-2" />
