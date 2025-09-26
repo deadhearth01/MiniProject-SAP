@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
@@ -20,7 +20,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 
-export default function AchievementsPage() {
+function AchievementsContent() {
   const { userProfile } = useAuth()
   const searchParams = useSearchParams()
   const [achievements, setAchievements] = useState<any[]>([])
@@ -391,5 +391,18 @@ export default function AchievementsPage() {
         </main>
       </div>
     </ProtectedRoute>
+  )
+}
+
+export default function AchievementsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gitam-primary mx-auto"></div>
+        <p className="mt-4 text-gray-600">Loading achievements...</p>
+      </div>
+    </div>}>
+      <AchievementsContent />
+    </Suspense>
   )
 }

@@ -41,14 +41,14 @@ export default function SubmitAchievementPage() {
   })
 
   const calculatePoints = (level: string, position: string) => {
-    const levelPoints = {
+    const levelPoints: Record<string, number> = {
       'International': 100,
       'National': 75,
       'State': 50,
       'College': 25
     }
     
-    const positionMultiplier = {
+    const positionMultiplier: Record<string, number> = {
       '1st': 1.0,
       '2nd': 0.8,
       '3rd': 0.6,
@@ -56,7 +56,7 @@ export default function SubmitAchievementPage() {
       'Other': 0.5
     }
     
-    return Math.round(levelPoints[level] * positionMultiplier[position])
+    return Math.round((levelPoints[level] || 10) * (positionMultiplier[position] || 0.3))
   }
 
   const uploadFile = async (file: File, bucket: string) => {
