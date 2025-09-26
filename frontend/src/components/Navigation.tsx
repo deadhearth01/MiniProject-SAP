@@ -60,6 +60,10 @@ export default function Navigation() {
       items = [...items, ...adminNavItems]
     }
     
+    // Debug log to check if admin items are being added
+    console.log('User Profile:', userProfile)
+    console.log('Navigation Items:', items)
+    
     return items
   }
 
@@ -94,7 +98,7 @@ export default function Navigation() {
                     href={item.href}
                     className={`gitam-nav-item flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                       isActive(item.href)
-                        ? 'bg-white bg-opacity-20'
+                        ? 'gitam-nav-item-active'
                         : 'hover:bg-white hover:bg-opacity-10'
                     }`}
                   >
@@ -166,7 +170,7 @@ export default function Navigation() {
                   href={item.href}
                   className={`flex items-center px-3 py-2 rounded-md text-base font-medium transition-colors ${
                     isActive(item.href)
-                      ? 'bg-white bg-opacity-20 text-white'
+                      ? 'gitam-nav-item-active text-white'
                       : 'text-white hover:bg-white hover:bg-opacity-10 hover:text-white'
                   }`}
                   onClick={() => setIsMobileMenuOpen(false)}
