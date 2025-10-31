@@ -65,35 +65,37 @@ export default function SearchStudentsPage() {
   const fetchStudents = async () => {
     try {
       setLoading(true)
-      
-      // Fetch all students (not faculty or admin)
+
+      // Optimized query: Fetch students with their achievement stats in a single query
       const { data: studentsData, error: studentsError } = await supabase
         .from('users')
-        .select('*')
+        .select(`
+          *,
+          achievements!inner (
+            points,
+            status
+          )
+        `)
         .eq('is_faculty', false)
         .eq('is_admin', false)
         .order('name')
 
       if (studentsError) throw studentsError
 
-      // Fetch achievements count and points for each student
-      const studentsWithStats = await Promise.all(
-        (studentsData || []).map(async (student) => {
-          const { data: achievements } = await supabase
-            .from('achievements')
-            .select('points, status')
-            .eq('user_id', student.id)
+      // Process the data to calculate stats
+      const studentsWithStats = (studentsData || []).map((student: any) => {
+        const approvedAchievements = student.achievements?.filter((a: any) => a.status === 'approved') || []
+        const totalPoints = approvedAchievements.reduce((sum: number, a: any) => sum + (a.points || 0), 0)
 
-          const approvedAchievements = achievements?.filter(a => a.status === 'approved') || []
-          const totalPoints = approvedAchievements.reduce((sum, a) => sum + (a.points || 0), 0)
-          
-          return {
-            ...student,
-            achievement_count: achievements?.length || 0,
-            total_points: totalPoints
-          }
-        })
-      )
+        // Remove achievements array from the student object to keep it clean
+        const { achievements, ...studentData } = student
+
+        return {
+          ...studentData,
+          achievement_count: approvedAchievements.length,
+          total_points: totalPoints
+        }
+      })
 
       setStudents(studentsWithStats)
       setFilteredStudents(studentsWithStats)

@@ -102,6 +102,9 @@ export default function LeaderboardPage() {
         query = query.eq('category', categoryFilter)
       }
 
+      // Limit results for better performance
+      query = query.limit(5000) // Reasonable limit to prevent slow loading
+
       const { data: achievements, error } = await query
 
       if (error) {

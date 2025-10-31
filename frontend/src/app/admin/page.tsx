@@ -40,63 +40,99 @@ export default function AdminDashboardPage() {
 
   const fetchAdminStats = async () => {
     try {
+      setLoading(true)
       console.log('🔍 [ADMIN] Fetching admin statistics...')
-      
-      // Fetch users count
-      const { count: usersCount, error: usersError } = await supabase
-        .from('users')
-        .select('*', { count: 'exact', head: true })
 
-      if (usersError) {
-        console.error('❌ [ADMIN] Users count error:', usersError)
-        throw usersError
+      // Use Promise.all for parallel queries to speed up loading
+      const [
+        usersResult,
+        pendingCountResult,
+        recentAchievementsResult
+      ] = await Promise.all([
+        // Fetch users count
+        supabase.from('users').select('*', { count: 'exact', head: true }),
+
+        // Fetch pending approvals count
+        supabase
+          .from('achievements')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'pending'),
+
+        // Fetch recent pending achievements with user data (limited to 5)
+        supabase
+          .from('achievements')
+          .select(`
+            *,
+            users (
+              name,
+              roll_number_faculty_id
+            )
+          `)
+          .eq('status', 'pending')
+          .order('submitted_at', { ascending: false })
+          .limit(5)
+      ])
+
+      // Handle users count
+      if (usersResult.error) {
+        console.error('❌ [ADMIN] Users count error:', usersResult.error)
+        throw usersResult.error
       }
-
+      const usersCount = usersResult.count || 0
       console.log(`✅ [ADMIN] Total users: ${usersCount}`)
 
-      // Fetch achievements data
-      const { data: achievements, error: achievementsError } = await supabase
-        .from('achievements')
-        .select('*')
-        .order('submitted_at', { ascending: false })
+      // Handle pending count
+      if (pendingCountResult.error) {
+        console.error('❌ [ADMIN] Pending count error:', pendingCountResult.error)
+        throw pendingCountResult.error
+      }
+      const pendingApprovals = pendingCountResult.count || 0
+      console.log(`📋 [ADMIN] Pending approvals: ${pendingApprovals}`)
 
-      if (achievementsError) {
-        console.error('❌ [ADMIN] Achievements error:', achievementsError)
-        throw achievementsError
+      // Handle recent achievements
+      if (recentAchievementsResult.error) {
+        console.error('❌ [ADMIN] Recent achievements error:', recentAchievementsResult.error)
+        setRecentAchievements([])
+      } else {
+        console.log(`✅ [ADMIN] Recent achievements: ${recentAchievementsResult.data?.length || 0}`)
+        setRecentAchievements(recentAchievementsResult.data || [])
       }
 
-      console.log(`✅ [ADMIN] Total achievements: ${achievements?.length || 0}`)
+      // Fetch aggregated stats with limit to prevent slow loading
+      const { data: recentAchievements, error: statsError } = await supabase
+        .from('achievements')
+        .select('status, category, level, approved_at, date')
+        .order('submitted_at', { ascending: false })
+        .limit(2000) // Reasonable limit for performance
 
-      const totalAchievements = achievements?.length || 0
-      const pendingApprovals = achievements?.filter(a => a.status === 'pending').length || 0
-      
-      console.log(`📋 [ADMIN] Pending approvals: ${pendingApprovals}`)
-      
+      if (statsError) {
+        console.error('❌ [ADMIN] Stats error:', statsError)
+        throw statsError
+      }
+
+      const totalAchievements = recentAchievements?.length || 0
+
       // Count achievements approved today
       const today = new Date().toISOString().split('T')[0]
-      const approvedToday = achievements?.filter(a => 
-        a.status === 'approved' && 
-        a.approved_at && 
+      const approvedToday = recentAchievements?.filter(a =>
+        a.status === 'approved' &&
+        a.approved_at &&
         new Date(a.approved_at).toISOString().split('T')[0] === today
       ).length || 0
-
-      console.log(`✅ [ADMIN] Approved today: ${approvedToday}`)
 
       // Count this month's achievements
       const currentMonth = new Date().getMonth()
       const currentYear = new Date().getFullYear()
-      const thisMonthAchievements = achievements?.filter(a => {
+      const thisMonthAchievements = recentAchievements?.filter(a => {
         const achDate = new Date(a.date)
         return achDate.getMonth() === currentMonth && achDate.getFullYear() === currentYear
       }).length || 0
-
-      console.log(`📅 [ADMIN] This month achievements: ${thisMonthAchievements}`)
 
       // Category and level breakdown
       const categories: Record<string, number> = {}
       const levels: Record<string, number> = {}
 
-      achievements?.forEach(achievement => {
+      recentAchievements?.forEach(achievement => {
         categories[achievement.category] = (categories[achievement.category] || 0) + 1
         levels[achievement.level] = (levels[achievement.level] || 0) + 1
       })
@@ -104,32 +140,8 @@ export default function AdminDashboardPage() {
       console.log('📊 [ADMIN] Categories:', categories)
       console.log('📊 [ADMIN] Levels:', levels)
 
-      // Recent achievements for review
-      const recent = achievements
-        ?.filter(a => a.status === 'pending')
-        ?.slice(0, 5) || []
-
-      console.log(`🕒 [ADMIN] Recent pending: ${recent.length}`)
-
-      // Fetch user details for recent achievements
-      const recentWithUsers = await Promise.all(
-        recent.map(async (achievement) => {
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('name, roll_number_faculty_id')
-            .eq('id', achievement.user_id)
-            .single()
-          
-          if (userError) {
-            console.error(`⚠️  [ADMIN] Error fetching user ${achievement.user_id}:`, userError)
-          }
-          
-          return { ...achievement, user: userData }
-        })
-      )
-
       setStats({
-        totalUsers: usersCount || 0,
+        totalUsers: usersCount,
         totalAchievements,
         pendingApprovals,
         approvedToday,
@@ -138,7 +150,6 @@ export default function AdminDashboardPage() {
         levels
       })
 
-      setRecentAchievements(recentWithUsers)
       setError('')
       console.log('✅ [ADMIN] Dashboard data loaded successfully')
     } catch (error: any) {
@@ -220,8 +231,75 @@ export default function AdminDashboardPage() {
       <ProtectedRoute requiredRole="admin">
         <div className="min-h-screen bg-gray-50">
           <Navigation />
-          <div className="flex items-center justify-center pt-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gitam-primary"></div>
+          <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            <div className="px-4 py-6 sm:px-0">
+              {/* Header Skeleton */}
+              <div className="mb-8">
+                <div className="h-8 bg-gray-200 rounded w-64 mb-2 animate-pulse"></div>
+                <div className="h-4 bg-gray-200 rounded w-96 animate-pulse"></div>
+              </div>
+
+              {/* Stats Grid Skeleton */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="gitam-card p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="h-4 bg-gray-200 rounded w-20 mb-2 animate-pulse"></div>
+                        <div className="h-8 bg-gray-200 rounded w-12 mb-2 animate-pulse"></div>
+                        <div className="h-3 bg-gray-200 rounded w-16 animate-pulse"></div>
+                      </div>
+                      <div className="h-12 w-12 bg-gray-200 rounded-lg animate-pulse"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Charts Skeleton */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                {[...Array(2)].map((_, i) => (
+                  <div key={i} className="gitam-card p-6">
+                    <div className="h-6 bg-gray-200 rounded w-48 mb-4 animate-pulse"></div>
+                    <div className="space-y-3">
+                      {[...Array(4)].map((_, j) => (
+                        <div key={j} className="flex justify-between items-center">
+                          <div className="h-4 bg-gray-200 rounded w-20 animate-pulse"></div>
+                          <div className="flex items-center space-x-2">
+                            <div className="h-2 bg-gray-200 rounded w-20 animate-pulse"></div>
+                            <div className="h-4 bg-gray-200 rounded w-8 animate-pulse"></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Recent Achievements Skeleton */}
+              <div>
+                <div className="h-6 bg-gray-200 rounded w-48 mb-4 animate-pulse"></div>
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="gitam-card p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <div className="h-5 bg-gray-200 rounded w-48 animate-pulse"></div>
+                            <div className="h-6 bg-gray-200 rounded w-16 animate-pulse"></div>
+                          </div>
+                          <div className="h-4 bg-gray-200 rounded w-32 mb-1 animate-pulse"></div>
+                          <div className="h-3 bg-gray-200 rounded w-24 animate-pulse"></div>
+                        </div>
+                        <div className="text-right">
+                          <div className="h-4 bg-gray-200 rounded w-16 mb-1 animate-pulse"></div>
+                          <div className="h-3 bg-gray-200 rounded w-12 animate-pulse"></div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </ProtectedRoute>
