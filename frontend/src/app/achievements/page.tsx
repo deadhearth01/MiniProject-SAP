@@ -41,15 +41,27 @@ function AchievementsContent() {
       setShowSuccess(true)
       setTimeout(() => setShowSuccess(false), 5000)
     }
-    fetchAchievements()
-  }, [searchParams])
+    // Only fetch achievements when userProfile is available
+    if (userProfile) {
+      fetchAchievements()
+    }
+  }, [searchParams, userProfile])
 
   useEffect(() => {
     applyFilters()
   }, [achievements, searchTerm, selectedFilters])
 
   const fetchAchievements = async () => {
+    // Don't fetch if userProfile is not available yet
+    if (!userProfile) {
+      console.log('User profile not available yet, skipping fetch')
+      return
+    }
+
     try {
+      setLoading(true)
+      console.log('Fetching achievements for user:', userProfile.id)
+
       let query = supabase
         .from('achievements')
         .select(`
@@ -78,11 +90,14 @@ function AchievementsContent() {
         })
         throw error
       }
-      
+
+      console.log(`Successfully fetched ${data?.length || 0} achievements`)
       setAchievements(data || [])
     } catch (error: any) {
       console.error('Error fetching achievements:', error)
       console.error('Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)))
+      // Set empty array on error to prevent infinite loading
+      setAchievements([])
     } finally {
       setLoading(false)
     }
@@ -181,21 +196,15 @@ function AchievementsContent() {
 
   if (loading) {
     return (
-      <ProtectedRoute>
-        <div className="min-h-screen bg-gray-50">
-          <Navigation />
-          <div className="flex items-center justify-center pt-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gitam-primary"></div>
-          </div>
-        </div>
-      </ProtectedRoute>
+      <div className="flex items-center justify-center pt-20">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gitam-primary"></div>
+      </div>
     )
   }
 
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
-        <Navigation />
+    <div className="min-h-screen bg-gray-50">
+      <Navigation />
         
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
@@ -403,19 +412,16 @@ function AchievementsContent() {
           </div>
         </main>
       </div>
-    </ProtectedRoute>
-  )
-}
+    )
+  }
 
 export default function AchievementsPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gitam-primary mx-auto"></div>
-        <p className="mt-4 text-gray-600">Loading achievements...</p>
+    <ProtectedRoute>
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <AchievementsContent />
       </div>
-    </div>}>
-      <AchievementsContent />
-    </Suspense>
+    </ProtectedRoute>
   )
 }
