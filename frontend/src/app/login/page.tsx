@@ -17,16 +17,13 @@ export default function LoginPage() {
   const { signIn, user, userProfile } = useAuth()
   const router = useRouter()
 
-  // Redirect if already logged in - force a full-page navigation once to avoid router race conditions
-  const redirectRef = React.useRef(false)
+  // Redirect if already logged in
   React.useEffect(() => {
-    if (user && userProfile && !redirectRef.current) {
-      redirectRef.current = true
-      console.log('👤 User already logged in, forcing full navigation to dashboard...')
-      // Force a full reload to avoid any client-side router race or HMR interference
-      window.location.href = '/dashboard'
+    if (user && userProfile) {
+      console.log('👤 User already logged in, redirecting to dashboard...')
+      router.replace('/dashboard')
     }
-  }, [user, userProfile])
+  }, [user, userProfile, router])
 
   // Load saved credentials on mount
   React.useEffect(() => {
