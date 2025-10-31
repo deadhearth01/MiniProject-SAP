@@ -154,22 +154,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (rollNumberOrFacultyId: string, password: string) => {
     try {
+      console.log('🔐 Starting sign in process...')
+      
       // Clear any stale auth data before signing in
       await supabase.auth.signOut()
       localStorage.removeItem('last_auth_check')
       
-      // ✅ PRODUCTION MODE: Real Supabase Authentication
-      
-      // First, find the user by roll number or faculty ID
-      const { data: userData, error: userError } = await supabase
+      // First, find the user by roll number or faculty ID with timeout
+      const userQueryPromise = supabase
         .from('users')
         .select('email')
         .eq('roll_number_faculty_id', rollNumberOrFacultyId)
         .single()
 
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout')), 5000)
+      )
+
+      const { data: userData, error: userError } = await Promise.race([
+        userQueryPromise,
+        timeoutPromise
+      ]) as any
+
       if (userError || !userData) {
+        console.error('❌ User not found:', userError)
         return { success: false, error: 'User not found. Please check your roll number/faculty ID.' }
       }
+
+      console.log('✅ User found, attempting authentication...')
 
       // Sign in with Supabase Auth using email and password
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -178,16 +190,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
 
       if (error) {
+        console.error('❌ Auth error:', error)
         return { success: false, error: error.message || 'Invalid credentials' }
       }
 
       // Set fresh auth check timestamp
       localStorage.setItem('last_auth_check', Date.now().toString())
-
+      
+      console.log('✅ Sign in successful!')
       return { success: true }
       
-    } catch (error) {
-      return { success: false, error: 'An unexpected error occurred' }
+    } catch (error: any) {
+      console.error('❌ Sign in exception:', error)
+      return { success: false, error: error.message || 'An unexpected error occurred' }
     }
   }
 

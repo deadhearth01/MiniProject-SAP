@@ -26,13 +26,28 @@ export default function LoginPage() {
     }
   }, [])
 
+  // Always reset loading state after navigation attempt
+  React.useEffect(() => {
+    return () => {
+      setLoading(false)
+    }
+  }, [])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
+    // Add a timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      setLoading(false)
+      setError('Login timeout - please try again')
+    }, 10000) // 10 second timeout
+
     try {
       const result = await signIn(rollNumberOrFacultyId, password)
+      
+      clearTimeout(timeoutId) // Clear timeout on success
       
       if (result.success) {
         // Save ID if remember me is checked
@@ -42,16 +57,15 @@ export default function LoginPage() {
           localStorage.removeItem('rememberedId')
         }
         
-        // Force a small delay to ensure auth state is set
-        await new Promise(resolve => setTimeout(resolve, 500))
-        
-        // Use replace to prevent back button issues
+        // Navigate immediately - no delay needed
         router.replace('/dashboard')
       } else {
         setError(result.error || 'Login failed')
         setLoading(false)
       }
     } catch (err) {
+      clearTimeout(timeoutId)
+      console.error('Login error:', err)
       setError('An unexpected error occurred')
       setLoading(false)
     }
