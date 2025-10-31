@@ -35,7 +35,9 @@ export default function DashboardPage() {
     totalPoints: 0
   })
   const [recentAchievements, setRecentAchievements] = useState<any[]>([])
+  const [thisMonthAchievements, setThisMonthAchievements] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     if (userProfile) {
@@ -44,21 +46,52 @@ export default function DashboardPage() {
   }, [userProfile])
 
   const fetchDashboardData = async () => {
+    if (!userProfile?.id) {
+      console.warn('⚠️  No user profile ID found')
+      return
+    }
+    
     try {
+      console.log('🔍 Fetching dashboard data for user:', userProfile.id, userProfile.name)
+      
       // Fetch user's achievements
-      const { data: achievements } = await supabase
+      const { data: achievements, error: achievementsError } = await supabase
         .from('achievements')
         .select('*')
         .eq('user_id', userProfile.id)
+        .order('date', { ascending: false })
+
+      if (achievementsError) {
+        console.error('❌ Error fetching achievements:', achievementsError)
+        setError(`Failed to load achievements: ${achievementsError.message}`)
+        setLoading(false)
+        return
+      }
+
+      console.log(`✅ Fetched ${achievements?.length || 0} achievements for user`)
+      
+      if (achievements && achievements.length > 0) {
+        console.log('Sample achievement:', {
+          event: achievements[0].event_name,
+          status: achievements[0].status,
+          points: achievements[0].points
+        })
+      }
 
       const totalAchievements = achievements?.length || 0
       const pendingApprovals = achievements?.filter(a => a.status === 'pending').length || 0
       
       // Current month achievements
-      const currentMonth = new Date().getMonth()
-      const monthlyAchievements = achievements?.filter(a => 
-        new Date(a.date).getMonth() === currentMonth
-      ).length || 0
+      const currentDate = new Date()
+      const currentMonth = currentDate.getMonth()
+      const currentYear = currentDate.getFullYear()
+      
+      const monthlyAchievementsData = achievements?.filter(a => {
+        const achDate = new Date(a.date)
+        return achDate.getMonth() === currentMonth && achDate.getFullYear() === currentYear
+      }) || []
+
+      console.log(`📅 This month (${currentMonth + 1}/${currentYear}): ${monthlyAchievementsData.length} achievements`)
 
       // Get recent achievements
       const recent = achievements?.slice(0, 5) || []
@@ -66,25 +99,36 @@ export default function DashboardPage() {
       // Calculate total points
       const totalPoints = achievements?.reduce((sum, achievement) => sum + (achievement.points || 0), 0) || 0
 
-      // Get leaderboard position (simplified)
-      const { data: leaderboard } = await supabase
+      console.log(`💯 Total points calculated: ${totalPoints}`)
+
+      // Get leaderboard position
+      const { data: leaderboard, error: leaderboardError } = await supabase
         .from('leaderboard')
         .select('*')
         .eq('user_id', userProfile.id)
-        .eq('year', new Date().getFullYear())
+        .eq('year', currentYear)
         .single()
+
+      if (leaderboardError && leaderboardError.code !== 'PGRST116') {
+        console.warn('⚠️  Leaderboard error:', leaderboardError.message)
+      } else if (leaderboard) {
+        console.log(`🏆 Leaderboard position: Rank ${leaderboard.rank}, ${leaderboard.total_points} points`)
+      }
 
       setStats({
         totalAchievements,
         pendingApprovals,
-        monthlyAchievements,
+        monthlyAchievements: monthlyAchievementsData.length,
         leaderboardPosition: leaderboard?.rank || 0,
         totalPoints
       })
 
       setRecentAchievements(recent)
+      setThisMonthAchievements(monthlyAchievementsData)
+      setError('')
     } catch (error) {
-      console.error('Error fetching dashboard data:', error)
+      console.error('❌ Error fetching dashboard data:', error)
+      setError('Failed to load dashboard data. Please try refreshing the page.')
     } finally {
       setLoading(false)
     }
@@ -95,6 +139,12 @@ export default function DashboardPage() {
     if (hour < 12) return 'Good morning'
     if (hour < 17) return 'Good afternoon'
     return 'Good evening'
+  }
+
+  const getCurrentMonthName = () => {
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                    'July', 'August', 'September', 'October', 'November', 'December']
+    return months[new Date().getMonth()]
   }
 
   const statCards = [
@@ -185,12 +235,19 @@ export default function DashboardPage() {
             {/* Header */}
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-gray-900">
-                {getGreeting()}, {userProfile?.name}!
+                {getGreeting()}, {userProfile?.name?.split(' ')[0]}! 👋
               </h1>
-              <p className="text-gray-600 mt-2">
-                Welcome to your achievement portal
-              </p>
-            </div>
+          <p className="text-gray-600 mt-2">
+            {userProfile?.roll_number_faculty_id} • {userProfile?.branch}
+          </p>
+        </div>
+
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+            <p className="font-medium">Error loading dashboard</p>
+            <p className="text-sm mt-1">{error}</p>
+          </div>
+        )}
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -263,6 +320,74 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* This Month's Achievements */}
+            <div className="mb-8">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                  <Calendar className="h-6 w-6 mr-2 text-green-600" />
+                  {getCurrentMonthName()} Achievements
+                </h2>
+                <Link href="/achievements" className="text-gitam-primary hover:text-gitam-dark text-sm font-medium">
+                  View all →
+                </Link>
+              </div>
+              
+              {thisMonthAchievements.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {thisMonthAchievements.map((achievement: any) => (
+                    <div key={achievement.id} className="gitam-card p-5">
+                      <div className="flex justify-between items-start mb-3">
+                        <h4 className="font-semibold text-gray-900 flex-1">{achievement.event_name}</h4>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          achievement.status === 'approved' ? 'bg-green-100 text-green-800' :
+                          achievement.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {achievement.status}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                        <div>
+                          <p className="text-gray-500">Level</p>
+                          <p className="font-medium text-gray-900">{achievement.level}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Position</p>
+                          <p className="font-medium text-gray-900">{achievement.position}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Category</p>
+                          <p className="font-medium text-gray-900">{achievement.category}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Points</p>
+                          <p className="font-medium text-green-600">{achievement.points}</p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        {new Date(achievement.date).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="gitam-card p-8 text-center">
+                  <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600">No achievements yet this month</p>
+                  <p className="text-sm text-gray-500 mt-1">Start by submitting your latest achievement!</p>
+                  <Link href="/achievements/submit">
+                    <button className="mt-4 px-6 py-2 bg-gitam-primary text-white rounded-lg hover:bg-gitam-dark transition-colors">
+                      Submit Achievement
+                    </button>
+                  </Link>
+                </div>
+              )}
+            </div>
+
             {/* Recent Achievements */}
             <div>
               <div className="flex justify-between items-center mb-4">
@@ -313,3 +438,4 @@ export default function DashboardPage() {
     </ProtectedRoute>
   )
 }
+

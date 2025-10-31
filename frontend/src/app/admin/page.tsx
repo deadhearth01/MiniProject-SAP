@@ -32,6 +32,7 @@ export default function AdminDashboardPage() {
   })
   const [recentAchievements, setRecentAchievements] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     fetchAdminStats()
@@ -39,20 +40,37 @@ export default function AdminDashboardPage() {
 
   const fetchAdminStats = async () => {
     try {
+      console.log('🔍 [ADMIN] Fetching admin statistics...')
+      
       // Fetch users count
-      const { count: usersCount } = await supabase
+      const { count: usersCount, error: usersError } = await supabase
         .from('users')
         .select('*', { count: 'exact', head: true })
+
+      if (usersError) {
+        console.error('❌ [ADMIN] Users count error:', usersError)
+        throw usersError
+      }
+
+      console.log(`✅ [ADMIN] Total users: ${usersCount}`)
 
       // Fetch achievements data
       const { data: achievements, error: achievementsError } = await supabase
         .from('achievements')
         .select('*')
+        .order('submitted_at', { ascending: false })
 
-      if (achievementsError) throw achievementsError
+      if (achievementsError) {
+        console.error('❌ [ADMIN] Achievements error:', achievementsError)
+        throw achievementsError
+      }
+
+      console.log(`✅ [ADMIN] Total achievements: ${achievements?.length || 0}`)
 
       const totalAchievements = achievements?.length || 0
       const pendingApprovals = achievements?.filter(a => a.status === 'pending').length || 0
+      
+      console.log(`📋 [ADMIN] Pending approvals: ${pendingApprovals}`)
       
       // Count achievements approved today
       const today = new Date().toISOString().split('T')[0]
@@ -62,11 +80,17 @@ export default function AdminDashboardPage() {
         new Date(a.approved_at).toISOString().split('T')[0] === today
       ).length || 0
 
+      console.log(`✅ [ADMIN] Approved today: ${approvedToday}`)
+
       // Count this month's achievements
       const currentMonth = new Date().getMonth()
-      const thisMonthAchievements = achievements?.filter(a => 
-        new Date(a.date).getMonth() === currentMonth
-      ).length || 0
+      const currentYear = new Date().getFullYear()
+      const thisMonthAchievements = achievements?.filter(a => {
+        const achDate = new Date(a.date)
+        return achDate.getMonth() === currentMonth && achDate.getFullYear() === currentYear
+      }).length || 0
+
+      console.log(`📅 [ADMIN] This month achievements: ${thisMonthAchievements}`)
 
       // Category and level breakdown
       const categories: Record<string, number> = {}
@@ -77,20 +101,28 @@ export default function AdminDashboardPage() {
         levels[achievement.level] = (levels[achievement.level] || 0) + 1
       })
 
+      console.log('📊 [ADMIN] Categories:', categories)
+      console.log('📊 [ADMIN] Levels:', levels)
+
       // Recent achievements for review
       const recent = achievements
         ?.filter(a => a.status === 'pending')
-        ?.sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime())
         ?.slice(0, 5) || []
+
+      console.log(`🕒 [ADMIN] Recent pending: ${recent.length}`)
 
       // Fetch user details for recent achievements
       const recentWithUsers = await Promise.all(
         recent.map(async (achievement) => {
-          const { data: userData } = await supabase
+          const { data: userData, error: userError } = await supabase
             .from('users')
             .select('name, roll_number_faculty_id')
             .eq('id', achievement.user_id)
             .single()
+          
+          if (userError) {
+            console.error(`⚠️  [ADMIN] Error fetching user ${achievement.user_id}:`, userError)
+          }
           
           return { ...achievement, user: userData }
         })
@@ -107,8 +139,11 @@ export default function AdminDashboardPage() {
       })
 
       setRecentAchievements(recentWithUsers)
-    } catch (error) {
-      console.error('Error fetching admin stats:', error)
+      setError('')
+      console.log('✅ [ADMIN] Dashboard data loaded successfully')
+    } catch (error: any) {
+      console.error('❌ [ADMIN] Error fetching admin stats:', error)
+      setError(`Failed to load admin dashboard: ${error.message || 'Unknown error'}`)
     } finally {
       setLoading(false)
     }
@@ -207,6 +242,19 @@ export default function AdminDashboardPage() {
                 Welcome back, {userProfile?.name}. Here's what's happening.
               </p>
             </div>
+
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+            <p className="font-medium">Error Loading Dashboard</p>
+            <p className="text-sm mt-1">{error}</p>
+            <button 
+              onClick={() => fetchAdminStats()} 
+              className="mt-2 text-sm underline hover:no-underline"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -356,3 +404,4 @@ export default function AdminDashboardPage() {
     </ProtectedRoute>
   )
 }
+

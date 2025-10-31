@@ -23,7 +23,12 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.variable} font-sans antialiased bg-gray-50`}>
         <AuthProvider>
-          {children}
+          {/* Wrap children in a client-hydration-tolerant container to avoid
+              hydration mismatch caused by browser extensions or client-only
+              attributes on the <body> element. */}
+          <div id="app-root" suppressHydrationWarning>
+            {children}
+          </div>
         </AuthProvider>
       </body>
     </html>

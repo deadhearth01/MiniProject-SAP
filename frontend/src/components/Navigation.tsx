@@ -17,11 +17,13 @@ import {
   Menu, 
   X,
   Search,
-  User
+  User,
+  FileText
 } from 'lucide-react'
 
 export default function Navigation() {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const { user, userProfile, signOut } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
@@ -31,158 +33,114 @@ export default function Navigation() {
     router.push('/login')
   }
 
-  const navItems = [
+  const baseItems = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
     { name: 'Achievements', href: '/achievements', icon: Trophy },
     { name: 'Submit Achievement', href: '/achievements/submit', icon: Plus },
+    { name: 'Bulk Upload', href: '/achievements/bulk-upload', icon: FileText },
     { name: 'Leaderboard', href: '/leaderboard', icon: BarChart3 },
+    { name: 'Notifications', href: '/notifications', icon: Bell },
   ]
 
-  const facultyNavItems = [
+  const facultyItems = [
     { name: 'Search Students', href: '/students', icon: Search },
-    { name: 'All Achievements', href: '/achievements/all', icon: Trophy },
   ]
 
-  const adminNavItems = [
+  const adminItems = [
     { name: 'Admin Panel', href: '/admin', icon: Settings },
     { name: 'Pending Approvals', href: '/admin/approvals', icon: Users },
-    { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
   ]
 
-  const getNavItems = () => {
-    let items = [...navItems]
-    
-    if (userProfile?.is_faculty || userProfile?.is_admin) {
-      items = [...items, ...facultyNavItems]
-    }
-    
-    if (userProfile?.is_admin) {
-      items = [...items, ...adminNavItems]
-    }
-    
-    // Debug log to check if admin items are being added
-    console.log('User Profile:', userProfile)
-    console.log('Navigation Items:', items)
-    
-    return items
-  }
+  let items = [...baseItems]
+  if (userProfile?.is_faculty || userProfile?.is_admin) items = [...items, ...facultyItems]
+  if (userProfile?.is_admin) items = [...items, ...adminItems]
 
   const isActive = (href: string) => pathname === href
 
   return (
-    <nav className="gitam-gradient shadow-lg">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex items-center">
-            {/* Logo */}
-            <Link href="/dashboard" className="flex-shrink-0 flex items-center">
-              <Image
-                src="/gitam.png"
-                alt="GITAM Logo"
-                width={40}
-                height={40}
-                className="h-10 w-10"
-              />
-              <span className="ml-3 gitam-header-text text-xl font-bold hidden sm:block">
-                GITAM Portal
-              </span>
-            </Link>
+    <>
+      {/* Mobile top bar */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#007367] p-3 flex items-center justify-between text-white">
+        <Link href="/dashboard" className="flex items-center space-x-3">
+          <Image src="/gitam.png" alt="GITAM" width={28} height={28} />
+          <div className="text-sm font-bold">GITAM Portal</div>
+        </Link>
+        <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 rounded-md bg-white/10">
+          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+      </div>
 
-            {/* Desktop Navigation */}
-            <div className="hidden md:ml-10 md:flex md:space-x-8">
-              {getNavItems().map((item) => {
-                const Icon = item.icon
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    className={`gitam-nav-item flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      isActive(item.href)
-                        ? 'gitam-nav-item-active'
-                        : 'hover:bg-white hover:bg-opacity-10'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4 mr-2" />
-                    {item.name}
-                  </Link>
-                )
-              })}
+      {/* Mobile overlay menu */}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 z-40 bg-black/50 p-4">
+          <div className="bg-white rounded-lg p-4 text-gray-800">
+            <div className="flex justify-between items-center mb-4">
+              <div className="font-bold">Menu</div>
+              <button onClick={() => setMobileOpen(false)} className="p-2">
+                <X />
+              </button>
             </div>
+            <nav className="space-y-2">
+              {items.map(i => (
+                <Link key={i.href} href={i.href} className="block px-3 py-2 rounded hover:bg-gray-100" onClick={() => setMobileOpen(false)}>
+                  <div className="flex items-center gap-3">
+                    {/* @ts-ignore */}
+                    <i.icon className="h-4 w-4" />
+                    <span>{i.name}</span>
+                  </div>
+                </Link>
+              ))}
+            </nav>
           </div>
+        </div>
+      )}
 
-          {/* Right side */}
-          <div className="flex items-center">
-            {/* Notifications */}
+      <aside className="fixed inset-y-0 left-0 w-72 bg-[#007367] text-white shadow-lg hidden md:flex flex-col z-40">
+      <div className="flex items-center justify-between px-4 py-4">
+        <Link href="/dashboard" className="flex items-center space-x-3">
+          <Image src="/gitam.png" alt="GITAM" width={36} height={36} />
+          <div>
+            <div className="text-lg font-bold">GITAM Portal</div>
+            <div className="text-xs opacity-80">Achievement System</div>
+          </div>
+        </Link>
+        <button onClick={() => setCollapsed(!collapsed)} className="p-2 rounded-md bg-white/10">
+          {collapsed ? <Menu className="h-4 w-4" /> : <X className="h-4 w-4" />}
+        </button>
+      </div>
+
+      <nav className="flex-1 overflow-y-auto px-2 py-4 space-y-1">
+        {items.map((item) => {
+          const Icon = item.icon
+          return (
             <Link
-              href="/notifications"
-              className="p-2 rounded-full text-white hover:bg-white hover:bg-opacity-10 hover:text-white transition-colors"
-            >
-              <Bell className="h-5 w-5" />
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-white/10 ${
+                isActive(item.href) ? 'bg-[#ebdfbc] text-[#007367] font-semibold' : ''
+              }`}>
+              <Icon className="h-4 w-4" />
+              <span>{item.name}</span>
             </Link>
+          )
+        })}
+      </nav>
 
-            {/* User Profile */}
-            <div className="ml-4 flex items-center text-white">
-              <div className="flex items-center">
-                <User className="h-5 w-5 mr-2" />
-                <div className="hidden sm:block">
-                  <p className="text-sm font-medium">{userProfile?.name}</p>
-                  <p className="text-xs text-white opacity-80">
-                    {userProfile?.roll_number_faculty_id}
-                  </p>
-                </div>
-              </div>
-              
-              <button
-                onClick={handleSignOut}
-                className="ml-4 p-2 rounded-full text-white hover:bg-white hover:bg-opacity-10 hover:text-white transition-colors"
-                title="Sign out"
-              >
-                <LogOut className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Mobile menu button */}
-            <div className="md:hidden ml-4">
-              <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="p-2 rounded-md text-white hover:text-white hover:bg-white hover:bg-opacity-10"
-              >
-                {isMobileMenuOpen ? (
-                  <X className="h-6 w-6" />
-                ) : (
-                  <Menu className="h-6 w-6" />
-                )}
-              </button>
-            </div>
+      <div className="px-4 py-4 border-t border-white/10">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-sm font-medium">{userProfile?.name}</div>
+            <div className="text-xs opacity-80">{userProfile?.roll_number_faculty_id}</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={handleSignOut} className="p-2 rounded-md bg-white/10">
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Mobile menu */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden bg-gitam-dark">
-          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-            {getNavItems().map((item) => {
-              const Icon = item.icon
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`flex items-center px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                    isActive(item.href)
-                      ? 'gitam-nav-item-active text-white'
-                      : 'text-white hover:bg-white hover:bg-opacity-10 hover:text-white'
-                  }`}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <Icon className="w-5 h-5 mr-3" />
-                  {item.name}
-                </Link>
-              )
-            })}
-          </div>
-        </div>
-      )}
-    </nav>
+    </aside>
+    </>
   )
 }

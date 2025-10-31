@@ -54,7 +54,7 @@ function AchievementsContent() {
         .from('achievements')
         .select(`
           *,
-          users (
+          users:user_id (
             name,
             roll_number_faculty_id,
             school,
@@ -69,10 +69,20 @@ function AchievementsContent() {
 
       const { data, error } = await query.order('submitted_at', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        throw error
+      }
+      
       setAchievements(data || [])
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching achievements:', error)
+      console.error('Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)))
     } finally {
       setLoading(false)
     }
@@ -83,11 +93,12 @@ function AchievementsContent() {
 
     // Search filter
     if (searchTerm) {
-      filtered = filtered.filter(achievement =>
-        achievement.event_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        achievement.users?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        achievement.organizer.toLowerCase().includes(searchTerm.toLowerCase())
-      )
+      filtered = filtered.filter((achievement: any) => {
+        const user = achievement.users
+        return achievement.event_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          achievement.organizer.toLowerCase().includes(searchTerm.toLowerCase())
+      })
     }
 
     // Category filter
@@ -328,7 +339,9 @@ function AchievementsContent() {
                       <div className="space-y-2 text-sm text-gray-600 mb-4">
                         <div className="flex items-center">
                           <User className="h-4 w-4 mr-2" />
-                          <span>{achievement.users?.name} ({achievement.users?.roll_number_faculty_id})</span>
+                          <span>
+                            {achievement.users?.name} ({achievement.users?.roll_number_faculty_id})
+                          </span>
                         </div>
                         <div className="flex items-center">
                           <Award className="h-4 w-4 mr-2" />

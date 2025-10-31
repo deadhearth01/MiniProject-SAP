@@ -28,6 +28,21 @@ interface LeaderboardEntry {
   recent_achievement?: string
 }
 
+interface AchievementWithUser {
+  user_id: string
+  points: number
+  date: string
+  category: string
+  event_name: string
+  users: {
+    name: string
+    roll_number_faculty_id: string
+    school: string
+    branch: string
+    is_faculty: boolean
+  }
+}
+
 export default function LeaderboardPage() {
   const { userProfile } = useAuth()
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
@@ -51,7 +66,7 @@ export default function LeaderboardPage() {
           date,
           category,
           event_name,
-          users!inner (
+          users:user_id (
             name,
             roll_number_faculty_id,
             school,
@@ -85,7 +100,16 @@ export default function LeaderboardPage() {
 
       const { data: achievements, error } = await query
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        console.error('Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error)))
+        throw error
+      }
 
       // Group by user and calculate totals
       const userStats = new Map<string, {
@@ -100,9 +124,11 @@ export default function LeaderboardPage() {
         is_faculty: boolean
       }>()
 
-      achievements?.forEach(achievement => {
+      achievements?.forEach((achievement: any) => {
         const userId = achievement.user_id
         const user = achievement.users
+
+        if (!user) return // Skip if no user data
 
         if (!userStats.has(userId)) {
           userStats.set(userId, {

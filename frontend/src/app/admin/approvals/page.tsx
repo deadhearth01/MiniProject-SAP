@@ -44,7 +44,7 @@ export default function AdminApprovalsPage() {
         .from('achievements')
         .select(`
           *,
-          users (
+          users:user_id (
             name,
             roll_number_faculty_id,
             school,
@@ -57,10 +57,20 @@ export default function AdminApprovalsPage() {
         `)
         .order('submitted_at', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        throw error
+      }
+      
       setAchievements(data || [])
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching achievements:', error)
+      console.error('Full error:', JSON.stringify(error, Object.getOwnPropertyNames(error)))
     } finally {
       setLoading(false)
     }

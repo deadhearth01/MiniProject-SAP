@@ -57,8 +57,8 @@ npm install
 ### 3. Environment Variables
 Create `.env.local` in the frontend directory:
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://uabapzejhthbsahxtikh.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhYmFwemVqaHRoYnNhaHh0aWtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4NzI3MzUsImV4cCI6MjA3NDQ0ODczNX0.iBaqblA6_yJxevCXTgr7s22uJQLvpCRV0IMkmm2L81o
+NEXT_PUBLIC_SUPABASE_URL=https://xbrfedbgypepjmjmmlwk.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhicmZlZGJneXBlcGptam1tbHdrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4NTk2NDMsImV4cCI6MjA3NzQzNTY0M30.uSS_LT2OnFFjPuwKtvhvYCmwecf0TcHIMYIzAQPnxVA
 ```
 
 ### 4. Database Setup

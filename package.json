@@ -9,7 +9,16 @@
     "lint": "cd frontend && npm run lint",
     "install-frontend": "cd frontend && npm install"
   },
-  "keywords": ["nextjs", "supabase", "achievement", "portal", "gitam"],
+  "keywords": [
+    "nextjs",
+    "supabase",
+    "achievement",
+    "portal",
+    "gitam"
+  ],
   "author": "GITAM University",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.78.0"
+  }
 }
