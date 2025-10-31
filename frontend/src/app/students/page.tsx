@@ -5,7 +5,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Navigation from '@/components/Navigation'
 import { supabase } from '@/lib/supabase'
-import { Search, Trophy, User, Mail, Book, Calendar } from 'lucide-react'
+import { Search, Trophy, User, Mail, Book, Calendar, Download, Loader2 } from 'lucide-react'
+import * as XLSX from 'xlsx'
 
 interface Student {
   id: string
@@ -40,6 +41,7 @@ export default function SearchStudentsPage() {
   const [studentAchievements, setStudentAchievements] = useState<Achievement[]>([])
   const [loading, setLoading] = useState(true)
   const [achievementsLoading, setAchievementsLoading] = useState(false)
+  const [exportLoading, setExportLoading] = useState(false)
 
   useEffect(() => {
     fetchStudents()
@@ -146,6 +148,67 @@ export default function SearchStudentsPage() {
     }
   }
 
+  const exportStudents = async () => {
+    setExportLoading(true)
+    try {
+      console.log('👥 [EXPORT] Starting student search export...')
+
+      // Use filtered students if there's a search term, otherwise all students
+      const studentsToExport = searchTerm.trim() !== '' ? filteredStudents : students
+
+      // Transform data for Excel
+      const excelData = studentsToExport.map((student) => ({
+        'Name': student.name,
+        'Roll Number/ID': student.roll_number_faculty_id,
+        'Email': student.email,
+        'School': student.school,
+        'Branch': student.branch,
+        'Batch': student.batch,
+        'Phone': student.phone,
+        'Total Points': student.total_points || 0,
+        'Achievement Count': student.achievement_count || 0,
+        'Search Filter': searchTerm.trim() !== '' ? `Search: "${searchTerm}"` : 'All Students'
+      }))
+
+      // Create workbook and worksheet
+      const wb = XLSX.utils.book_new()
+      const ws = XLSX.utils.json_to_sheet(excelData)
+
+      // Auto-size columns
+      const colWidths = [
+        { wch: 20 }, // Name
+        { wch: 15 }, // Roll Number/ID
+        { wch: 25 }, // Email
+        { wch: 15 }, // School
+        { wch: 15 }, // Branch
+        { wch: 8 },  // Batch
+        { wch: 12 }, // Phone
+        { wch: 12 }, // Total Points
+        { wch: 16 }, // Achievement Count
+        { wch: 20 }  // Search Filter
+      ]
+      ws['!cols'] = colWidths
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Students')
+
+      // Generate filename with timestamp and search info
+      const timestamp = new Date().toISOString().split('T')[0]
+      const searchSuffix = searchTerm.trim() !== '' ? '_search_results' : '_all'
+      const filename = `students${searchSuffix}_${timestamp}.xlsx`
+
+      // Save file
+      XLSX.writeFile(wb, filename)
+
+      console.log('✅ [EXPORT] Student search export completed')
+
+    } catch (error: any) {
+      console.error('❌ [EXPORT] Student search export failed:', error)
+      alert('Failed to export student data. Please try again.')
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
   return (
     <ProtectedRoute requiredRole="faculty">
       <div className="min-h-screen bg-gray-50">
@@ -154,8 +217,33 @@ export default function SearchStudentsPage() {
         <main className="max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="mb-6 sm:mb-8">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Search Students</h1>
-            <p className="text-sm sm:text-base text-gray-600">Search and view student achievement records</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Search Students</h1>
+                <p className="text-sm sm:text-base text-gray-600">Search and view student achievement records</p>
+              </div>
+              <button
+                onClick={exportStudents}
+                disabled={exportLoading || filteredStudents.length === 0}
+                className={`flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${
+                  exportLoading || filteredStudents.length === 0
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-gitam-primary hover:bg-gitam-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gitam-primary'
+                }`}
+              >
+                {exportLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export Results
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Search Bar */}

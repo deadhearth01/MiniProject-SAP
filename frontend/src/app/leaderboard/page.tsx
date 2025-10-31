@@ -13,8 +13,11 @@ import {
   Crown,
   Star,
   Target,
-  Calendar
+  Calendar,
+  Download,
+  Loader2
 } from 'lucide-react'
+import * as XLSX from 'xlsx'
 
 interface LeaderboardEntry {
   user_id: string
@@ -50,6 +53,7 @@ export default function LeaderboardPage() {
   const [timeFilter, setTimeFilter] = useState('all') // all, month, semester, year
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [userRank, setUserRank] = useState<LeaderboardEntry | null>(null)
+  const [exportLoading, setExportLoading] = useState(false)
 
   useEffect(() => {
     fetchLeaderboard()
@@ -204,6 +208,63 @@ export default function LeaderboardPage() {
     }
   }
 
+  const exportLeaderboard = async () => {
+    setExportLoading(true)
+    try {
+      console.log('🏆 [EXPORT] Starting leaderboard export...')
+
+      // Transform current leaderboard data for Excel
+      const excelData = leaderboard.map((entry, index) => ({
+        'Rank': entry.rank,
+        'Name': entry.name,
+        'Roll Number/ID': entry.roll_number_faculty_id,
+        'School': entry.school,
+        'Branch': entry.branch,
+        'Total Points': entry.total_points,
+        'Achievement Count': entry.achievement_count,
+        'Time Period': getTimeFilterLabel(),
+        'Category Filter': categoryFilter === 'all' ? 'All Categories' : categoryFilter
+      }))
+
+      // Create workbook and worksheet
+      const wb = XLSX.utils.book_new()
+      const ws = XLSX.utils.json_to_sheet(excelData)
+
+      // Auto-size columns
+      const colWidths = [
+        { wch: 6 },  // Rank
+        { wch: 20 }, // Name
+        { wch: 15 }, // Roll Number/ID
+        { wch: 15 }, // School
+        { wch: 15 }, // Branch
+        { wch: 12 }, // Total Points
+        { wch: 16 }, // Achievement Count
+        { wch: 12 }, // Time Period
+        { wch: 15 }  // Category Filter
+      ]
+      ws['!cols'] = colWidths
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Leaderboard')
+
+      // Generate filename with timestamp and filters
+      const timestamp = new Date().toISOString().split('T')[0]
+      const timeSuffix = timeFilter === 'all' ? '' : `_${timeFilter}`
+      const categorySuffix = categoryFilter === 'all' ? '' : `_${categoryFilter.toLowerCase()}`
+      const filename = `leaderboard${timeSuffix}${categorySuffix}_${timestamp}.xlsx`
+
+      // Save file
+      XLSX.writeFile(wb, filename)
+
+      console.log('✅ [EXPORT] Leaderboard export completed')
+
+    } catch (error: any) {
+      console.error('❌ [EXPORT] Leaderboard export failed:', error)
+      alert('Failed to export leaderboard data. Please try again.')
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
   if (loading) {
     return (
       <ProtectedRoute>
@@ -229,7 +290,30 @@ export default function LeaderboardPage() {
               <div className="flex justify-center mb-4">
                 <Trophy className="h-12 w-12 text-gitam-primary" />
               </div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">Leaderboard</h1>
+              <div className="flex items-center justify-center space-x-4 mb-4">
+                <h1 className="text-4xl font-bold text-gray-900">Leaderboard</h1>
+                <button
+                  onClick={exportLeaderboard}
+                  disabled={exportLoading || leaderboard.length === 0}
+                  className={`flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${
+                    exportLoading || leaderboard.length === 0
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-gitam-primary hover:bg-gitam-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gitam-primary'
+                  }`}
+                >
+                  {exportLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Exporting...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 mr-2" />
+                      Export
+                    </>
+                  )}
+                </button>
+              </div>
               <p className="text-gray-600">
                 Celebrate achievements and compete with peers
               </p>
