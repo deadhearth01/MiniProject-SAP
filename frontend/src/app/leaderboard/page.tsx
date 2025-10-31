@@ -49,7 +49,7 @@ interface AchievementWithUser {
 export default function LeaderboardPage() {
   const { userProfile } = useAuth()
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false) // Start as false since global loading handles initial state
   const [timeFilter, setTimeFilter] = useState('all') // all, month, semester, year
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [userRank, setUserRank] = useState<LeaderboardEntry | null>(null)

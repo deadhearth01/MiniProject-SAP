@@ -36,7 +36,7 @@ export default function DashboardPage() {
   })
   const [recentAchievements, setRecentAchievements] = useState<any[]>([])
   const [thisMonthAchievements, setThisMonthAchievements] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false) // Start as false since global loading handles initial state
   const [error, setError] = useState('')
 
   useEffect(() => {

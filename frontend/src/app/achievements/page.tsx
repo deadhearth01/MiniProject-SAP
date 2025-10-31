@@ -25,7 +25,7 @@ function AchievementsContent() {
   const searchParams = useSearchParams()
   const [achievements, setAchievements] = useState<any[]>([])
   const [filteredAchievements, setFilteredAchievements] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false) // Start as false since global loading handles initial state
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedFilters, setSelectedFilters] = useState({
     category: '',

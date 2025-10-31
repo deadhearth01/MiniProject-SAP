@@ -24,7 +24,7 @@ export default function AdminApprovalsPage() {
   const { userProfile } = useAuth()
   const [achievements, setAchievements] = useState<any[]>([])
   const [filteredAchievements, setFilteredAchievements] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false) // Start as false since global loading handles initial state
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [selectedAchievement, setSelectedAchievement] = useState<any>(null)
   const [showModal, setShowModal] = useState(false)
