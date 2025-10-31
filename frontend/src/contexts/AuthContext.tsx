@@ -126,14 +126,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (signInError) {
         console.error('❌ Sign in error:', signInError)
-        return { 
-          success: false, 
-          error: signInError.message || 'Invalid credentials' 
+        return {
+          success: false,
+          error: signInError.message || 'Invalid credentials'
         }
       }
 
-      // Wait a moment for auth state to update
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // If Supabase returned a session immediately, set local state and fetch profile synchronously
+      try {
+        const session = (authData as any)?.session
+        const signedUser = session?.user
+        if (signedUser) {
+          setSession(session)
+          setUser(signedUser)
+
+          // Try to fetch profile and wait (with a short timeout) so callers get a ready state
+          const fetchPromise = fetchUserProfile(signedUser.id)
+
+          // Wait up to 2 seconds for profile to load
+          await Promise.race([
+            fetchPromise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('profile_timeout')), 2000))
+          ]).catch((err) => {
+            // Log but don't fail sign-in; profile may be populated via onAuthStateChange
+            console.warn('⚠️ profile fetch did not finish in 2s:', err)
+          })
+        }
+      } catch (err) {
+        console.warn('⚠️ Non-fatal error while preparing session/profile:', err)
+      }
 
       console.log('✅ Sign in successful')
       return { success: true }
