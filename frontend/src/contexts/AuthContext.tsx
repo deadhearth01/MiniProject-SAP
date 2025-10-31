@@ -24,6 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true
+    let authCheckComplete = false
 
     // Check if Supabase is properly configured
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
@@ -35,12 +36,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Get initial session from Supabase with timeout
     const getInitialSession = async () => {
       try {
+        // Clear any stale auth state from localStorage
+        const lastAuthCheck = localStorage.getItem('last_auth_check')
+        const now = Date.now()
+        
+        // If last check was more than 1 hour ago, clear stale data
+        if (lastAuthCheck && (now - parseInt(lastAuthCheck)) > 3600000) {
+          console.log('Clearing stale auth data...')
+          await supabase.auth.signOut()
+        }
+        
+        localStorage.setItem('last_auth_check', now.toString())
+
         const { data: { session }, error } = await supabase.auth.getSession()
 
         if (!mounted) return
 
         if (error) {
           console.error('Error getting session:', error)
+          // Clear any corrupted auth data
+          await supabase.auth.signOut()
+          authCheckComplete = true
           setLoading(false)
           return
         }
@@ -50,8 +66,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           await fetchUserProfile(session.user.id)
         }
+        authCheckComplete = true
       } catch (error) {
         console.error('Error in getInitialSession:', error)
+        // Clear corrupted state
+        await supabase.auth.signOut()
+        authCheckComplete = true
       } finally {
         if (mounted) {
           setLoading(false)
@@ -61,13 +81,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     getInitialSession()
 
-    // Fallback timeout to prevent infinite loading
+    // Fallback timeout to prevent infinite loading - reduced to 5 seconds
     const timeoutId = setTimeout(() => {
-      if (mounted) {
-        console.warn('Auth initialization timeout - setting loading to false')
-        setLoading(false)
+      if (mounted && !authCheckComplete) {
+        console.warn('Auth initialization timeout - forcing refresh')
+        // Clear auth state and reload
+        supabase.auth.signOut().then(() => {
+          setLoading(false)
+          setSession(null)
+          setUser(null)
+          setUserProfile(null)
+        })
       }
-    }, 10000) // 10 second timeout
+    }, 5000) // 5 second timeout
 
     // Listen for auth changes
     const {
@@ -77,6 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Clear timeout since we got a response
       clearTimeout(timeoutId)
+      authCheckComplete = true
 
       setSession(session)
       setUser(session?.user ?? null)
@@ -112,6 +139,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (rollNumberOrFacultyId: string, password: string) => {
     try {
+      // Clear any stale auth data before signing in
+      await supabase.auth.signOut()
+      localStorage.removeItem('last_auth_check')
+      
       // ✅ PRODUCTION MODE: Real Supabase Authentication
       
       // First, find the user by roll number or faculty ID
@@ -135,6 +166,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: error.message || 'Invalid credentials' }
       }
 
+      // Set fresh auth check timestamp
+      localStorage.setItem('last_auth_check', Date.now().toString())
+
       return { success: true }
       
     } catch (error) {
@@ -146,6 +180,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Clear testing mode data
     localStorage.removeItem('gitam-testing-session')
     localStorage.removeItem('gitam-testing-profile')
+    localStorage.removeItem('last_auth_check')
     
     // Clear state
     setUser(null)
