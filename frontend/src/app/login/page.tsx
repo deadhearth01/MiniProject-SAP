@@ -14,8 +14,16 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   
-  const { signIn } = useAuth()
+  const { signIn, user, userProfile } = useAuth()
   const router = useRouter()
+
+  // Redirect if already logged in
+  React.useEffect(() => {
+    if (user && userProfile) {
+      console.log('👤 User already logged in, redirecting to dashboard...')
+      router.replace('/dashboard')
+    }
+  }, [user, userProfile, router])
 
   // Load saved credentials on mount
   React.useEffect(() => {
@@ -32,9 +40,12 @@ export default function LoginPage() {
     setError('')
 
     try {
+      console.log('🔐 Attempting login...')
       const result = await signIn(rollNumberOrFacultyId, password)
       
       if (result.success) {
+        console.log('✅ Login successful, navigating to dashboard...')
+        
         // Save ID if remember me is checked
         if (rememberMe) {
           localStorage.setItem('rememberedId', rollNumberOrFacultyId)
@@ -42,16 +53,16 @@ export default function LoginPage() {
           localStorage.removeItem('rememberedId')
         }
         
-        // Navigate to dashboard
-        router.push('/dashboard')
+        // Force navigation to dashboard
+        window.location.href = '/dashboard'
       } else {
+        console.error('❌ Login failed:', result.error)
         setError(result.error || 'Login failed')
+        setLoading(false)
       }
     } catch (err) {
-      console.error('Login error:', err)
+      console.error('❌ Login error:', err)
       setError('An unexpected error occurred')
-    } finally {
-      // Always reset loading state
       setLoading(false)
     }
   }

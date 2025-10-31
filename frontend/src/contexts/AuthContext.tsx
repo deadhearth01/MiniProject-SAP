@@ -119,7 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Sign in with email and password
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
         email: userData.email,
         password: password,
       })
@@ -131,6 +131,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           error: signInError.message || 'Invalid credentials' 
         }
       }
+
+      // Wait a moment for auth state to update
+      await new Promise(resolve => setTimeout(resolve, 500))
 
       console.log('✅ Sign in successful')
       return { success: true }
