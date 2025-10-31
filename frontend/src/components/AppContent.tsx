@@ -10,42 +10,50 @@ interface AppContentProps {
 export default function AppContent({ children }: AppContentProps) {
   const { loading } = useAuth();
   const [appReady, setAppReady] = useState(false);
+  const [showLoading, setShowLoading] = useState(false);
 
   useEffect(() => {
     if (!loading) {
-      // Small delay to ensure everything is settled
-      const timer = setTimeout(() => setAppReady(true), 100);
-      return () => clearTimeout(timer);
+      // Immediately set app ready when auth loading completes
+      setAppReady(true);
     }
   }, [loading]);
 
-  // AGGRESSIVE GLOBAL TIMEOUT: Force app ready after 5 seconds max
+  // Show loading indicator only after 300ms to avoid flash for fast loads
+  useEffect(() => {
+    const loadingDelay = setTimeout(() => {
+      if (!appReady) {
+        setShowLoading(true);
+      }
+    }, 300);
+
+    return () => clearTimeout(loadingDelay);
+  }, [appReady]);
+
+  // Emergency timeout: Force app ready after 2 seconds max
   useEffect(() => {
     const globalTimeout = setTimeout(() => {
-      console.warn('🚨 GLOBAL EMERGENCY: Forcing app ready after 5 seconds');
-      setAppReady(true);
-    }, 5000);
+      if (!appReady) {
+        console.warn('⚡ Emergency timeout: Forcing app ready after 2 seconds');
+        setAppReady(true);
+      }
+    }, 2000);
 
     return () => clearTimeout(globalTimeout);
-  }, []);
+  }, [appReady]);
 
-  if (!appReady) {
+  // Show loading only if it's taking time
+  if (!appReady && showLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-gitam-primary mx-auto"></div>
-          <p className="text-gray-600 mt-4 text-lg">Initializing application...</p>
-          <p className="text-gray-400 text-sm mt-2">If this takes too long, please refresh the page</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-gitam-primary text-white rounded-lg hover:bg-gitam-dark transition-colors"
-          >
-            Force Refresh
-          </button>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gitam-primary mx-auto"></div>
+          <p className="text-gray-600 mt-3 text-sm">Loading...</p>
         </div>
       </div>
     );
   }
 
+  // For fast loads, render immediately without showing loading
   return <>{children}</>;
 }

@@ -42,24 +42,45 @@ export default function DashboardPage() {
   useEffect(() => {
     if (userProfile) {
       fetchDashboardData()
+    } else {
+      // Immediately stop loading if no user profile
+      setLoading(false)
     }
   }, [userProfile])
 
   const fetchDashboardData = async () => {
     if (!userProfile?.id) {
       console.warn('⚠️  No user profile ID found')
+      setLoading(false)
       return
     }
+    
+    setLoading(true)
     
     try {
       console.log('🔍 Fetching dashboard data for user:', userProfile.id, userProfile.name)
       
-      // Fetch user's achievements
-      const { data: achievements, error: achievementsError } = await supabase
-        .from('achievements')
-        .select('*')
-        .eq('user_id', userProfile.id)
-        .order('date', { ascending: false })
+      const currentDate = new Date()
+      const currentYear = currentDate.getFullYear()
+      
+      // Fetch achievements and leaderboard in parallel for faster loading
+      const [achievementsResult, leaderboardResult] = await Promise.all([
+        supabase
+          .from('achievements')
+          .select('*')
+          .eq('user_id', userProfile.id)
+          .order('date', { ascending: false })
+          .limit(100), // Limit to improve performance
+        supabase
+          .from('leaderboard')
+          .select('*')
+          .eq('user_id', userProfile.id)
+          .eq('year', currentYear)
+          .single()
+      ])
+
+      const { data: achievements, error: achievementsError } = achievementsResult
+      const { data: leaderboard, error: leaderboardError } = leaderboardResult
 
       if (achievementsError) {
         console.error('❌ Error fetching achievements:', achievementsError)
@@ -82,9 +103,7 @@ export default function DashboardPage() {
       const pendingApprovals = achievements?.filter(a => a.status === 'pending').length || 0
       
       // Current month achievements
-      const currentDate = new Date()
       const currentMonth = currentDate.getMonth()
-      const currentYear = currentDate.getFullYear()
       
       const monthlyAchievementsData = achievements?.filter(a => {
         const achDate = new Date(a.date)
@@ -100,14 +119,6 @@ export default function DashboardPage() {
       const totalPoints = achievements?.reduce((sum, achievement) => sum + (achievement.points || 0), 0) || 0
 
       console.log(`💯 Total points calculated: ${totalPoints}`)
-
-      // Get leaderboard position
-      const { data: leaderboard, error: leaderboardError } = await supabase
-        .from('leaderboard')
-        .select('*')
-        .eq('user_id', userProfile.id)
-        .eq('year', currentYear)
-        .single()
 
       if (leaderboardError && leaderboardError.code !== 'PGRST116') {
         console.warn('⚠️  Leaderboard error:', leaderboardError.message)

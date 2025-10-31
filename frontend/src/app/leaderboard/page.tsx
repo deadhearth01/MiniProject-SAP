@@ -56,12 +56,14 @@ export default function LeaderboardPage() {
   const [exportLoading, setExportLoading] = useState(false)
 
   useEffect(() => {
+    // Fetch immediately on mount and when filters change
     fetchLeaderboard()
   }, [timeFilter, categoryFilter])
 
   const fetchLeaderboard = async () => {
     setLoading(true)
     try {
+      // Build query with filters applied
       let query = supabase
         .from('achievements')
         .select(`
@@ -103,7 +105,7 @@ export default function LeaderboardPage() {
       }
 
       // Limit results for better performance
-      query = query.limit(5000) // Reasonable limit to prevent slow loading
+      query = query.limit(2000) // Reduced limit for faster loading
 
       const { data: achievements, error } = await query
 

@@ -41,9 +41,12 @@ function AchievementsContent() {
       setShowSuccess(true)
       setTimeout(() => setShowSuccess(false), 5000)
     }
-    // Only fetch achievements when userProfile is available
+    // Fetch achievements immediately when component mounts or userProfile changes
     if (userProfile) {
       fetchAchievements()
+    } else {
+      // Show empty state immediately if no user profile
+      setLoading(false)
     }
   }, [searchParams, userProfile])
 
