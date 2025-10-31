@@ -31,21 +31,30 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    const result = await signIn(rollNumberOrFacultyId, password)
-    
-    if (result.success) {
-      // Save ID if remember me is checked
-      if (rememberMe) {
-        localStorage.setItem('rememberedId', rollNumberOrFacultyId)
+    try {
+      const result = await signIn(rollNumberOrFacultyId, password)
+      
+      if (result.success) {
+        // Save ID if remember me is checked
+        if (rememberMe) {
+          localStorage.setItem('rememberedId', rollNumberOrFacultyId)
+        } else {
+          localStorage.removeItem('rememberedId')
+        }
+        
+        // Force a small delay to ensure auth state is set
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        // Use replace to prevent back button issues
+        router.replace('/dashboard')
       } else {
-        localStorage.removeItem('rememberedId')
+        setError(result.error || 'Login failed')
+        setLoading(false)
       }
-      router.push('/dashboard')
-    } else {
-      setError(result.error || 'Login failed')
+    } catch (err) {
+      setError('An unexpected error occurred')
+      setLoading(false)
     }
-    
-    setLoading(false)
   }
 
   return (

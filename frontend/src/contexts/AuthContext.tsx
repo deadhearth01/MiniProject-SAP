@@ -26,10 +26,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let mounted = true
     let authCheckComplete = false
 
+    // AGGRESSIVE FIX: Always set loading to false after max 3 seconds
+    const emergencyTimeout = setTimeout(() => {
+      if (mounted) {
+        console.warn('🚨 Emergency timeout - forcing loading to false')
+        setLoading(false)
+      }
+    }, 3000) // 3 second emergency timeout
+
     // Check if Supabase is properly configured
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
       console.error('Supabase environment variables not configured')
       setLoading(false)
+      clearTimeout(emergencyTimeout)
       return
     }
 
@@ -40,8 +49,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const lastAuthCheck = localStorage.getItem('last_auth_check')
         const now = Date.now()
         
-        // If last check was more than 1 hour ago, clear stale data
-        if (lastAuthCheck && (now - parseInt(lastAuthCheck)) > 3600000) {
+        // If last check was more than 30 minutes ago, clear stale data
+        if (lastAuthCheck && (now - parseInt(lastAuthCheck)) > 1800000) {
           console.log('Clearing stale auth data...')
           await supabase.auth.signOut()
         }
@@ -58,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await supabase.auth.signOut()
           authCheckComplete = true
           setLoading(false)
+          clearTimeout(emergencyTimeout)
           return
         }
 
@@ -75,25 +85,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } finally {
         if (mounted) {
           setLoading(false)
+          clearTimeout(emergencyTimeout)
         }
       }
     }
 
     getInitialSession()
 
-    // Fallback timeout to prevent infinite loading - reduced to 5 seconds
+    // Fallback timeout to prevent infinite loading
     const timeoutId = setTimeout(() => {
       if (mounted && !authCheckComplete) {
-        console.warn('Auth initialization timeout - forcing refresh')
-        // Clear auth state and reload
+        console.warn('Auth initialization timeout - clearing state')
+        // Clear auth state
         supabase.auth.signOut().then(() => {
-          setLoading(false)
-          setSession(null)
-          setUser(null)
-          setUserProfile(null)
+          if (mounted) {
+            setLoading(false)
+            setSession(null)
+            setUser(null)
+            setUserProfile(null)
+          }
         })
       }
-    }, 5000) // 5 second timeout
+    }, 2500) // 2.5 second timeout
 
     // Listen for auth changes
     const {
@@ -101,8 +114,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!mounted) return
 
-      // Clear timeout since we got a response
+      // Clear timeouts since we got a response
       clearTimeout(timeoutId)
+      clearTimeout(emergencyTimeout)
       authCheckComplete = true
 
       setSession(session)
@@ -118,6 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false
       clearTimeout(timeoutId)
+      clearTimeout(emergencyTimeout)
       subscription.unsubscribe()
     }
   }, [])

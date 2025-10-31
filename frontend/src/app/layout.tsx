@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import AuthRefreshWrapper from "@/components/AuthRefreshWrapper";
+import { AuthDebugger } from "@/components/AuthDebugger";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -25,6 +26,7 @@ export default function RootLayout({
       <body className={`${inter.variable} font-sans antialiased bg-gray-50`} suppressHydrationWarning>
         <AuthProvider>
           <AuthRefreshWrapper>
+            <AuthDebugger />
             {/* Wrap children in a client-hydration-tolerant container to avoid
                 hydration mismatch caused by browser extensions or client-only
                 attributes on the <body> element. */}
