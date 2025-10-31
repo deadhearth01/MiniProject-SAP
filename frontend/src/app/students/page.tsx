@@ -43,87 +43,78 @@ export default function SearchStudentsPage() {
   const [achievementsLoading, setAchievementsLoading] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
   const [error, setError] = useState('')
-  const [retryCount, setRetryCount] = useState(0)
 
-  useEffect(() => {
-    let isMounted = true
+  const loadStudents = async () => {
+    try {
+      setLoading(true)
+      setError('')
 
-    const loadStudents = async () => {
-      try {
-        setLoading(true)
-        setError('')
+      // Fetch all students first
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('is_faculty', false)
+        .eq('is_admin', false)
+        .order('name')
 
-        // Fetch all students first
-        const { data: studentsData, error: studentsError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('is_faculty', false)
-          .eq('is_admin', false)
-          .order('name')
+      if (studentsError) {
+        console.error('Students query error:', studentsError)
+        setError('Failed to load students. Please try again.')
+        return
+      }
 
-        if (studentsError) {
-          console.error('Students query error:', studentsError)
-          if (isMounted) setError('Failed to load students. Please try again.')
+      // Fetch all achievements for these students in one query
+      const studentIds = studentsData?.map(s => s.id) || []
+      let achievementsByUser: Record<string, any[]> = {}
+
+      if (studentIds.length > 0) {
+        const { data: achievementsData, error: achievementsError } = await supabase
+          .from('achievements')
+          .select('user_id, points, status')
+          .in('user_id', studentIds)
+
+        if (achievementsError) {
+          console.error('Achievements query error:', achievementsError)
+          setError('Failed to load achievement data. Please try again.')
           return
         }
 
-        // Fetch all achievements for these students in one query
-        const studentIds = studentsData?.map(s => s.id) || []
-        let achievementsByUser: Record<string, any[]> = {}
-
-        if (studentIds.length > 0) {
-          const { data: achievementsData, error: achievementsError } = await supabase
-            .from('achievements')
-            .select('user_id, points, status')
-            .in('user_id', studentIds)
-
-          if (achievementsError) {
-            console.error('Achievements query error:', achievementsError)
-            if (isMounted) setError('Failed to load achievement data. Please try again.')
-            return
+        // Group achievements by user_id
+        achievementsByUser = (achievementsData || []).reduce((acc: Record<string, any[]>, achievement: any) => {
+          const userId = achievement.user_id
+          if (!acc[userId]) {
+            acc[userId] = []
           }
+          acc[userId].push(achievement)
+          return acc
+        }, {} as Record<string, any[]>)
+      }        // Process the data to calculate stats
+      const studentsWithStats = (studentsData || []).map((student: any) => {
+        const userAchievements = achievementsByUser[student.id] || []
+        const approvedAchievements = userAchievements.filter((a: any) => a.status === 'approved')
+        const totalPoints = approvedAchievements.reduce((sum: number, a: any) => sum + (a.points || 0), 0)
 
-          // Group achievements by user_id
-          achievementsByUser = (achievementsData || []).reduce((acc: Record<string, any[]>, achievement: any) => {
-            const userId = achievement.user_id
-            if (!acc[userId]) {
-              acc[userId] = []
-            }
-            acc[userId].push(achievement)
-            return acc
-          }, {} as Record<string, any[]>)
-        }        // Process the data to calculate stats
-        const studentsWithStats = (studentsData || []).map((student: any) => {
-          const userAchievements = achievementsByUser[student.id] || []
-          const approvedAchievements = userAchievements.filter((a: any) => a.status === 'approved')
-          const totalPoints = approvedAchievements.reduce((sum: number, a: any) => sum + (a.points || 0), 0)
-
-          return {
-            ...student,
-            achievement_count: approvedAchievements.length,
-            total_points: totalPoints
-          }
-        })
-
-        if (isMounted) {
-          setStudents(studentsWithStats)
-          setFilteredStudents(studentsWithStats)
-          setError('')
+        return {
+          ...student,
+          achievement_count: approvedAchievements.length,
+          total_points: totalPoints
         }
-      } catch (error: any) {
-        console.error('Error fetching students:', error)
-        if (isMounted) setError('Failed to load students. Please try again.')
-      } finally {
-        if (isMounted) setLoading(false)
-      }
-    }
+      })
 
+      setStudents(studentsWithStats)
+      setFilteredStudents(studentsWithStats)
+      setError('')
+    } catch (error: any) {
+      console.error('Error fetching students:', error)
+      setError('Failed to load students. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
     loadStudents()
-
-    return () => {
-      isMounted = false
-    }
-  }, [retryCount]) // Add retryCount as dependency
+  }, []) // Empty dependency array - only run once on mount
 
   const fetchStudentAchievements = async (studentId: string) => {
     try {
@@ -275,7 +266,7 @@ export default function SearchStudentsPage() {
               <button
                 onClick={() => {
                   setError('')
-                  setRetryCount(prev => prev + 1)
+                  loadStudents()
                 }}
                 className="mt-2 text-sm underline hover:no-underline"
               >
