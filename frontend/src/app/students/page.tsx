@@ -42,6 +42,7 @@ export default function SearchStudentsPage() {
   const [loading, setLoading] = useState(true)
   const [achievementsLoading, setAchievementsLoading] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     fetchStudents()
@@ -66,41 +67,65 @@ export default function SearchStudentsPage() {
     try {
       setLoading(true)
 
-      // Optimized query: Fetch students with their achievement stats in a single query
+      // Fetch all students first
       const { data: studentsData, error: studentsError } = await supabase
         .from('users')
-        .select(`
-          *,
-          achievements (
-            points,
-            status
-          )
-        `)
+        .select('*')
         .eq('is_faculty', false)
         .eq('is_admin', false)
         .order('name')
 
-      if (studentsError) throw studentsError
+      if (studentsError) {
+        console.error('Students query error:', studentsError)
+        throw studentsError
+      }
 
-      // Process the data to calculate stats
-      const studentsWithStats = (studentsData || []).map((student: any) => {
-        const approvedAchievements = student.achievements?.filter((a: any) => a.status === 'approved') || []
-        const totalPoints = approvedAchievements.reduce((sum: number, a: any) => sum + (a.points || 0), 0)
+      // Fetch all achievements for these students in one query
+      const studentIds = studentsData?.map(s => s.id) || []
+      if (studentIds.length > 0) {
+        const { data: achievementsData, error: achievementsError } = await supabase
+          .from('achievements')
+          .select('user_id, points, status')
+          .in('user_id', studentIds)
 
-        // Remove achievements array from the student object to keep it clean
-        const { achievements, ...studentData } = student
-
-        return {
-          ...studentData,
-          achievement_count: approvedAchievements.length,
-          total_points: totalPoints
+        if (achievementsError) {
+          console.error('Achievements query error:', achievementsError)
+          throw achievementsError
         }
-      })
 
-      setStudents(studentsWithStats)
-      setFilteredStudents(studentsWithStats)
-    } catch (error) {
+        // Group achievements by user_id
+        const achievementsByUser = (achievementsData || []).reduce((acc: any, achievement: any) => {
+          if (!acc[achievement.user_id]) {
+            acc[achievement.user_id] = []
+          }
+          acc[achievement.user_id].push(achievement)
+          return acc
+        }, {})
+
+        // Process the data to calculate stats
+        const studentsWithStats = (studentsData || []).map((student: any) => {
+          const userAchievements = achievementsByUser[student.id] || []
+          const approvedAchievements = userAchievements.filter((a: any) => a.status === 'approved')
+          const totalPoints = approvedAchievements.reduce((sum: number, a: any) => sum + (a.points || 0), 0)
+
+          return {
+            ...student,
+            achievement_count: approvedAchievements.length,
+            total_points: totalPoints
+          }
+        })
+
+        setStudents(studentsWithStats)
+        setFilteredStudents(studentsWithStats)
+        setError('') // Clear any previous errors
+      } else {
+        setStudents([])
+        setFilteredStudents([])
+        setError('')
+      }
+    } catch (error: any) {
       console.error('Error fetching students:', error)
+      setError('Failed to load students. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -233,7 +258,7 @@ export default function SearchStudentsPage() {
                     : 'bg-gitam-primary hover:bg-gitam-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gitam-primary'
                 }`}
               >
-                {exportLoading ? (
+                                {exportLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Exporting...
@@ -247,6 +272,23 @@ export default function SearchStudentsPage() {
               </button>
             </div>
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+              <p className="font-medium">Error Loading Students</p>
+              <p className="text-sm mt-1">{error}</p>
+              <button
+                onClick={() => {
+                  setError('')
+                  fetchStudents()
+                }}
+                className="mt-2 text-sm underline hover:no-underline"
+              >
+                Try Again
+              </button>
+            </div>
+          )}
 
           {/* Search Bar */}
           <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-4 sm:mb-6">
