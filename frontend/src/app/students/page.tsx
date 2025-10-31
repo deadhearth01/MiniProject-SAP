@@ -71,7 +71,7 @@ export default function SearchStudentsPage() {
         .from('users')
         .select(`
           *,
-          achievements!inner (
+          achievements (
             points,
             status
           )
