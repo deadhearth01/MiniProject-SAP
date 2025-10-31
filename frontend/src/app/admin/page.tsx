@@ -90,8 +90,12 @@ export default function AdminDashboardPage() {
       console.log(`📋 [ADMIN] Pending approvals: ${pendingApprovals}`)
 
       // Handle recent achievements
-      if (recentAchievementsResult.error) {
-        console.error('❌ [ADMIN] Recent achievements error:', recentAchievementsResult.error)
+      if (recentAchievementsResult.error || !recentAchievementsResult.data) {
+        if (recentAchievementsResult.error && (recentAchievementsResult.error.message || recentAchievementsResult.error.code || Object.keys(recentAchievementsResult.error).length > 0)) {
+          console.error('❌ [ADMIN] Recent achievements error:', recentAchievementsResult.error)
+        } else if (!recentAchievementsResult.data) {
+          console.warn('⚠️ [ADMIN] No recent achievements data returned')
+        }
         setRecentAchievements([])
       } else {
         console.log(`✅ [ADMIN] Recent achievements: ${recentAchievementsResult.data?.length || 0}`)
