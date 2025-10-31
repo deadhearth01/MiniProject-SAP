@@ -43,66 +43,56 @@ export default function SearchStudentsPage() {
   const [achievementsLoading, setAchievementsLoading] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
   const [error, setError] = useState('')
+  const [retryCount, setRetryCount] = useState(0)
 
   useEffect(() => {
-    fetchStudents()
-  }, [])
+    let isMounted = true
 
-  useEffect(() => {
-    if (searchTerm.trim() === '') {
-      setFilteredStudents(students)
-    } else {
-      const filtered = students.filter(student => 
-        student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.roll_number_faculty_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.branch.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        student.school.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-      setFilteredStudents(filtered)
-    }
-  }, [searchTerm, students])
+    const loadStudents = async () => {
+      try {
+        setLoading(true)
+        setError('')
 
-  const fetchStudents = async () => {
-    try {
-      setLoading(true)
+        // Fetch all students first
+        const { data: studentsData, error: studentsError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('is_faculty', false)
+          .eq('is_admin', false)
+          .order('name')
 
-      // Fetch all students first
-      const { data: studentsData, error: studentsError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('is_faculty', false)
-        .eq('is_admin', false)
-        .order('name')
-
-      if (studentsError) {
-        console.error('Students query error:', studentsError)
-        throw studentsError
-      }
-
-      // Fetch all achievements for these students in one query
-      const studentIds = studentsData?.map(s => s.id) || []
-      if (studentIds.length > 0) {
-        const { data: achievementsData, error: achievementsError } = await supabase
-          .from('achievements')
-          .select('user_id, points, status')
-          .in('user_id', studentIds)
-
-        if (achievementsError) {
-          console.error('Achievements query error:', achievementsError)
-          throw achievementsError
+        if (studentsError) {
+          console.error('Students query error:', studentsError)
+          if (isMounted) setError('Failed to load students. Please try again.')
+          return
         }
 
-        // Group achievements by user_id
-        const achievementsByUser = (achievementsData || []).reduce((acc: any, achievement: any) => {
-          if (!acc[achievement.user_id]) {
-            acc[achievement.user_id] = []
-          }
-          acc[achievement.user_id].push(achievement)
-          return acc
-        }, {})
+        // Fetch all achievements for these students in one query
+        const studentIds = studentsData?.map(s => s.id) || []
+        let achievementsByUser: Record<string, any[]> = {}
 
-        // Process the data to calculate stats
+        if (studentIds.length > 0) {
+          const { data: achievementsData, error: achievementsError } = await supabase
+            .from('achievements')
+            .select('user_id, points, status')
+            .in('user_id', studentIds)
+
+          if (achievementsError) {
+            console.error('Achievements query error:', achievementsError)
+            if (isMounted) setError('Failed to load achievement data. Please try again.')
+            return
+          }
+
+          // Group achievements by user_id
+          achievementsByUser = (achievementsData || []).reduce((acc: Record<string, any[]>, achievement: any) => {
+            const userId = achievement.user_id
+            if (!acc[userId]) {
+              acc[userId] = []
+            }
+            acc[userId].push(achievement)
+            return acc
+          }, {} as Record<string, any[]>)
+        }        // Process the data to calculate stats
         const studentsWithStats = (studentsData || []).map((student: any) => {
           const userAchievements = achievementsByUser[student.id] || []
           const approvedAchievements = userAchievements.filter((a: any) => a.status === 'approved')
@@ -115,21 +105,25 @@ export default function SearchStudentsPage() {
           }
         })
 
-        setStudents(studentsWithStats)
-        setFilteredStudents(studentsWithStats)
-        setError('') // Clear any previous errors
-      } else {
-        setStudents([])
-        setFilteredStudents([])
-        setError('')
+        if (isMounted) {
+          setStudents(studentsWithStats)
+          setFilteredStudents(studentsWithStats)
+          setError('')
+        }
+      } catch (error: any) {
+        console.error('Error fetching students:', error)
+        if (isMounted) setError('Failed to load students. Please try again.')
+      } finally {
+        if (isMounted) setLoading(false)
       }
-    } catch (error: any) {
-      console.error('Error fetching students:', error)
-      setError('Failed to load students. Please try again.')
-    } finally {
-      setLoading(false)
     }
-  }
+
+    loadStudents()
+
+    return () => {
+      isMounted = false
+    }
+  }, [retryCount]) // Add retryCount as dependency
 
   const fetchStudentAchievements = async (studentId: string) => {
     try {
@@ -281,7 +275,7 @@ export default function SearchStudentsPage() {
               <button
                 onClick={() => {
                   setError('')
-                  fetchStudents()
+                  setRetryCount(prev => prev + 1)
                 }}
                 className="mt-2 text-sm underline hover:no-underline"
               >
